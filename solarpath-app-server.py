@@ -157,7 +157,7 @@ class SolarPathHttpRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_response(404)
         return
 
-addr = ('', 8080)
+addr = ('', 8050)
 sock = socket.socket (socket.AF_INET, socket.SOCK_STREAM)
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 sock.bind(addr)
