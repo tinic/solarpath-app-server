@@ -20,3 +20,10 @@ systemctl start mongod
 pip3 install numpy
 pip3 install bitstream bitstring pymongo httpserver requests
 
+# chirp install
+git clone https://github.com/RAKWireless/ChirpStack_on_Ubuntu.git
+cd ChirpStack_on_Ubuntu
+cp chirpstack-network-server_conf/chirpstack-network-server.us_902_928.toml ./chirpstack-network-server.toml
+sh install.sh
+cd ..
+
