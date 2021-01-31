@@ -1,10 +1,12 @@
-#!/usr/bin/sh
+#!/bin/sh
+
+# install script for Ubuntu 20.04 x64
 
 # ubuntu deps
-apt-get update
-apt-get upgrade
+apt-get update -y
+apt-get upgrade -y
 
-apt-get install git gcc python3-dev python3-venv python3-pip gpg
+apt-get install -y git gcc python3-dev python3-venv python3-pip gpg
 
 # mongo
 wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | apt-key add -
