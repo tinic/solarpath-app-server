@@ -3,7 +3,6 @@
 from bitstream import *
 from bitstring import *
 from datetime import *
-from tinydb import TinyDB, Query
 
 import json
 import http.server
