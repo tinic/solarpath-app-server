@@ -19,6 +19,57 @@ import socket
 
 mc = pymongo.MongoClient("localhost", 27017)
 
+def parse_bitstream(entry, bits):
+    entry['state']['battery_voltage'] = 0.1 * bits.read('uint:4') + 2.7
+    entry['state']['solar_voltage'] = 0.05 * bits.read('uint:4')
+    entry['state']['temperature'] = 0.25 * bits.read('uint:8') - 10
+    entry['state']['humidity'] = (1.0 / 63.0) * bits.read('uint:6')
+    entry['state']['power_good'] = bits.read('uint:1')
+    entry['state']['motion_detected'] = bits.read('uint:1')
+    return
+
+def encode_bitstream(entry):
+    return base64.b64encode(pack("uint:1, uint:1, "\
+        "uint:6, uint:6, uint:6, "\
+        "uint:6, uint:6, uint:6, "\
+        "uint:6, uint:6, uint:6",
+        int(entry['settings']['light_on']),
+        int(entry['settings']['auto_light_on']),
+        int(entry['settings']['colors'][0][0]*63),
+        int(entry['settings']['colors'][0][1]*63),
+        int(entry['settings']['colors'][0][2]*63),
+        int(entry['settings']['colors'][1][0]*63),
+        int(entry['settings']['colors'][1][1]*63),
+        int(entry['settings']['colors'][1][2]*63),
+        int(entry['settings']['colors'][2][0]*63),
+        int(entry['settings']['colors'][2][1]*63),
+        int(entry['settings']['colors'][2][2]*63)).bytes).decode("utf-8")
+
+def default_entry():
+    return {
+        'device_eui' : '',
+        'last_seen' : '',
+        'settings' : {
+            'light_on' : 0,
+            'auto_light_on' : 0,
+            'colors' : [
+                [1.0, 1.0, 1.0],
+                [1.0, 1.0, 1.0],
+                [1.0, 1.0, 1.0]
+            ]
+        },
+        'state' : {
+            'battery_voltage' : 0,
+            'solar_voltage' : 0,
+            'temperature' : 0,
+            'humidity' : 0,
+            'power_good' : 0,
+            'motion_detected' : 0
+        },
+        'last_downlink' : { },
+        'last_uplink' : { }
+    }
+
 class SolarPathHttpRequestHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith('/solarpath/hass'):
@@ -82,29 +133,7 @@ class SolarPathHttpRequestHandler(http.server.BaseHTTPRequestHandler):
 
                 entry = mc.solarpath.stations.find_one({'device_eui' : base64.b64decode(json_data['devEUI'])})
                 if (not entry):
-                    entry = {
-                        'device_eui' : '',
-                        'last_seen' : '',
-                        'settings' : {
-                            'light_on' : 0,
-                            'auto_light_on' : 0,
-                            'colors' : [
-                                [1.0, 1.0, 1.0],
-                                [1.0, 1.0, 1.0],
-                                [1.0, 1.0, 1.0]
-                            ]
-                        },
-                        'state' : {
-                            'battery_voltage' : 0,
-                            'solar_voltage' : 0,
-                            'temperature' : 0,
-                            'humidity' : 0,
-                            'power_good' : 0,
-                            'state_good' : 0
-                        },
-                        'last_downlink' : { },
-                        'last_uplink' : { }
-                    }
+                    entry = default_entry()
                 entry = entry.copy()
                 if hasattr(entry, '_id'):
                     del entry['_id']
@@ -116,31 +145,12 @@ class SolarPathHttpRequestHandler(http.server.BaseHTTPRequestHandler):
 
                 bits = BitString(base64.b64decode(json_data['data']))
 
-                entry['state']['battery_voltage'] = 0.1 * bits.read('uint:4') + 2.7
-                entry['state']['solar_voltage'] = 0.05 * bits.read('uint:4')
-                entry['state']['temperature'] = 0.25 * bits.read('uint:8') - 10
-                entry['state']['humidity'] = (1.0 / 63.0) * bits.read('uint:6')
-                entry['state']['power_good'] = bits.read('uint:1')
-                entry['state']['state_good'] = bits.read('uint:1')
+                parse_bitstream(entry, bits)
 
                 self.send_response(200)
                 self.end_headers()
 
-                payload_str = base64.b64encode(pack("uint:1, uint:1, "\
-                    "uint:6, uint:6, uint:6, "\
-                    "uint:6, uint:6, uint:6, "\
-                    "uint:6, uint:6, uint:6",
-                    int(entry['settings']['light_on']),
-                    int(entry['settings']['auto_light_on']),
-                    int(entry['settings']['colors'][0][0]*63),
-                    int(entry['settings']['colors'][0][1]*63),
-                    int(entry['settings']['colors'][0][2]*63),
-                    int(entry['settings']['colors'][1][0]*63),
-                    int(entry['settings']['colors'][1][1]*63),
-                    int(entry['settings']['colors'][1][2]*63),
-                    int(entry['settings']['colors'][2][0]*63),
-                    int(entry['settings']['colors'][2][1]*63),
-                    int(entry['settings']['colors'][2][2]*63)).bytes).decode("utf-8")
+                payload_str = encode_bitstream(entry)
 
                 down_data = {
                     'deviceQueueItem' : {
@@ -152,6 +162,8 @@ class SolarPathHttpRequestHandler(http.server.BaseHTTPRequestHandler):
 
                 queueURL = "http://localhost:8080/api/devices/" + devEUI + "/queue"
                 headers = {'Grpc-Metadata-Authorization' : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcGlfa2V5X2lkIjoiNWM1MzI1MGQtZTgzZC00MjMxLWJiOWYtNmVjMDMyY2E0YTUwIiwiYXVkIjoiYXMiLCJpc3MiOiJhcyIsIm5iZiI6MTYxMjM3NDAxMCwic3ViIjoiYXBpX2tleSJ9.p7dvcogUdJrJO86_MHMO6n-Apz0cymHQ-pTXqqvXFPs'}
+
+                print(requests.post(queueURL, json.dumps(down_data), headers = headers))
 
                 entry['last_downlink'] = json_data
                 entry['last_uplink'] = down_data
@@ -174,29 +186,7 @@ class SolarPathHttpRequestHandler(http.server.BaseHTTPRequestHandler):
 
                 entry = mc.solarpath.stations.find_one({'device_eui' : json_data['hardware_serial']})
                 if (not entry):
-                    entry = {
-                        'device_eui' : '',
-                        'last_seen' : '',
-                        'settings' : {
-                            'light_on' : 0,
-                            'auto_light_on' : 0,
-                            'colors' : [
-                                [1.0, 1.0, 1.0],
-                                [1.0, 1.0, 1.0],
-                                [1.0, 1.0, 1.0]
-                            ]
-                        },
-                        'state' : {
-                            'battery_voltage' : 0,
-                            'solar_voltage' : 0,
-                            'temperature' : 0,
-                            'humidity' : 0,
-                            'power_good' : 0,
-                            'state_good' : 0
-                        },
-                        'last_downlink' : { },
-                        'last_uplink' : { }
-                    }
+                    entry = default_entry()
                 entry = entry.copy()
                 if hasattr(entry, '_id'):
                     del entry['_id']
@@ -206,31 +196,12 @@ class SolarPathHttpRequestHandler(http.server.BaseHTTPRequestHandler):
 
                 bits = BitString(base64.b64decode(json_data['payload_raw']))
 
-                entry['state']['battery_voltage'] = 0.1 * bits.read('uint:4') + 2.7
-                entry['state']['solar_voltage'] = 0.05 * bits.read('uint:4')
-                entry['state']['temperature'] = 0.25 * bits.read('uint:8') - 10
-                entry['state']['humidity'] = (1.0 / 63.0) * bits.read('uint:6')
-                entry['state']['power_good'] = bits.read('uint:1')
-                entry['state']['state_good'] = bits.read('uint:1')
+                parse_bitstream(entry, bits)
 
                 self.send_response(200)
                 self.end_headers()
 
-                payload_str = base64.b64encode(pack("uint:1, uint:1, "\
-                    "uint:6, uint:6, uint:6, "\
-                    "uint:6, uint:6, uint:6, "\
-                    "uint:6, uint:6, uint:6",
-                    int(entry['settings']['light_on']),
-                    int(entry['settings']['auto_light_on']),
-                    int(entry['settings']['colors'][0][0]*63),
-                    int(entry['settings']['colors'][0][1]*63),
-                    int(entry['settings']['colors'][0][2]*63),
-                    int(entry['settings']['colors'][1][0]*63),
-                    int(entry['settings']['colors'][1][1]*63),
-                    int(entry['settings']['colors'][1][2]*63),
-                    int(entry['settings']['colors'][2][0]*63),
-                    int(entry['settings']['colors'][2][1]*63),
-                    int(entry['settings']['colors'][2][2]*63)).bytes).decode("utf-8")
+                payload_str = encode_bitstream(entry)
 
                 down_data = {
                     "dev_id" : json_data['dev_id'],
