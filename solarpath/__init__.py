@@ -1,0 +1,1 @@
+"""Solarpath Lights integration."""

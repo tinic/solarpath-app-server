@@ -1,0 +1,8 @@
+{
+  "domain": "solarpath_light",
+  "name": "Solarpath Light",
+  "documentation": "https://github.com/tinic/solarpath-app-server.git",
+  "dependencies": [],
+  "codeowners": [],
+  "requirements": []
+}
