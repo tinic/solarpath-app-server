@@ -1,0 +1,8 @@
+[Unit]
+Description=Solarpath App Server
+
+[Service]
+ExecStart=/root/solarpath-app-server/solarpath-app-server.py 1> /dev/null 2> /dev/null
+
+[Install]
+WantedBy=multi-user.target
