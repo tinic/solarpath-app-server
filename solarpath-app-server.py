@@ -100,8 +100,6 @@ class SolarPathHttpRequestHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path.startswith('/solarpath/hass'):
             try:
-                self.send_header("Content-type", "text/html")
-                self.end_headers()
                 self.data_string = self.rfile.read(int(self.headers['Content-Length']))
                 json_data = json.loads(self.data_string)
                 for entry in json_data:
@@ -111,7 +109,10 @@ class SolarPathHttpRequestHandler(http.server.BaseHTTPRequestHandler):
                         mc.solarpath.stations.update_one({'device_eui' : entry['device_eui']}, {'$set' : {'settings.auto_light_on' : entry['auto_light_on']}}, upsert=False)
                     if 'color' in entry:
                         mc.solarpath.stations.update_one({'device_eui' : entry['device_eui']}, {'$set' : {'settings.colors.0' : entry['color']}}, upsert=False)
+
                 self.send_response(200)
+                self.send_header("Content-type", "text/html")
+                self.end_headers()
                 return
             except:
                 self.send_response(500)
@@ -122,14 +123,15 @@ class SolarPathHttpRequestHandler(http.server.BaseHTTPRequestHandler):
             try:
                 if (urlparse(self.path).query != 'event=up'):
                     self.send_response(200)
+                    self.send_header("Content-type", "text/html")
                     self.end_headers()
                     return
 
-                self.send_header("Content-type", "text/html")
-                self.end_headers()
 
                 self.data_string = self.rfile.read(int(self.headers['Content-Length']))
                 json_data = json.loads(self.data_string)
+                
+                print(json_data)
 
                 entry = mc.solarpath.stations.find_one({'device_eui' : base64.b64decode(json_data['devEUI'])})
                 if (not entry):
@@ -148,6 +150,7 @@ class SolarPathHttpRequestHandler(http.server.BaseHTTPRequestHandler):
                 parse_bitstream(entry, bits)
 
                 self.send_response(200)
+                self.send_header("Content-type", "text/html")
                 self.end_headers()
 
                 payload_str = encode_bitstream(entry)
@@ -178,8 +181,6 @@ class SolarPathHttpRequestHandler(http.server.BaseHTTPRequestHandler):
 
         if self.path.startswith('/solarpath/ttn'):
             try:
-                self.send_header("Content-type", "text/html")
-                self.end_headers()
 
                 self.data_string = self.rfile.read(int(self.headers['Content-Length']))
                 json_data = json.loads(self.data_string)
@@ -199,6 +200,7 @@ class SolarPathHttpRequestHandler(http.server.BaseHTTPRequestHandler):
                 parse_bitstream(entry, bits)
 
                 self.send_response(200)
+                self.send_header("Content-type", "text/html")
                 self.end_headers()
 
                 payload_str = encode_bitstream(entry)
