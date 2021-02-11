@@ -131,16 +131,14 @@ class SolarPathHttpRequestHandler(http.server.BaseHTTPRequestHandler):
                 self.data_string = self.rfile.read(int(self.headers['Content-Length']))
                 json_data = json.loads(self.data_string)
                 
-                print(json_data)
+                devEUI = base64.b64decode(json_data['devEUI']).hex()
 
-                entry = mc.solarpath.stations.find_one({'device_eui' : base64.b64decode(json_data['devEUI'])})
+                entry = mc.solarpath.stations.find_one({'device_eui' : devEUI})
                 if (not entry):
                     entry = default_entry()
                 entry = entry.copy()
                 if hasattr(entry, '_id'):
                     del entry['_id']
-
-                devEUI = base64.b64decode(json_data['devEUI']).hex()
 
                 entry['device_eui'] = devEUI
                 entry['last_seen'] = datetime(2019, 5, 18, 15, 17, tzinfo=timezone.utc).isoformat()
